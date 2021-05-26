@@ -1,18 +1,22 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: philg
  * Date: 29/04/2018
  * Time: 16:48
  */
+
 namespace PhilGale92Docx;
+
 /**
  * Class DocxFileManipulation
  * @desc The purpose of this class, is pulling the xml structure out,
  * while preparing external references
  * @package PhilGale92Docx
  */
-abstract class DocxFileManipulation {
+abstract class DocxFileManipulation
+{
     /**
      * @var string
      * @desc File path
@@ -37,12 +41,12 @@ abstract class DocxFileManipulation {
      * @var FileAttachment[]
      * @desc Track files
      */
-    protected $_fileAttachments = [] ;
+    protected $_fileAttachments = [];
     /**
      * @var LinkAttachment[]
      * @desc Track external reference based links
      */
-    protected $_linkAttachments = [] ;
+    protected $_linkAttachments = [];
     /**
      * @var Style[]
      */
@@ -56,7 +60,7 @@ abstract class DocxFileManipulation {
      * @var bool|null
      * @desc Track the previous entity_loader flag
      */
-    private $_libXmlGlobalLoader = null ;
+    private $_libXmlGlobalLoader = null;
 
     /**
      * @var string
@@ -78,7 +82,7 @@ abstract class DocxFileManipulation {
     public function parse()
     {
         $fileUri = $this->_fileUri;
-        $this->_libXmlGlobalLoader  = libxml_disable_entity_loader( ) ;
+        $this->_libXmlGlobalLoader  = libxml_disable_entity_loader();
         $this->_baseUri = $fileUri;
         $this->_extractArchives();
     }
@@ -88,7 +92,9 @@ abstract class DocxFileManipulation {
      */
     public function __destruct()
     {
-        libxml_disable_entity_loader($this->_libXmlGlobalLoader) ;
+        if (PHP_VERSION_ID < 80000) {
+            libxml_disable_entity_loader($this->_libXmlGlobalLoader);
+        }
     }
 
     /**
@@ -98,8 +104,9 @@ abstract class DocxFileManipulation {
      * @return FileAttachment
      */
     protected function _createFileAttachmentFromSource(
-        $imageName, $imageData
-    ){
+        $imageName,
+        $imageData
+    ) {
         return new FileAttachment(
             $imageName,
             $imageData
@@ -110,19 +117,20 @@ abstract class DocxFileManipulation {
      * @desc Unzip and track the useful files
      *  - We need to track relationships, the main structure and any image assets
      */
-    private function _extractArchives(){
+    private function _extractArchives()
+    {
         $zipArchive = zip_open($this->_baseUri);
-        while ( $zipEntry = zip_read($zipArchive)){
+        while ($zipEntry = zip_read($zipArchive)) {
             $entryName = zip_entry_name($zipEntry);
             if (zip_entry_open($zipArchive, $zipEntry) == false) continue;
 
-            if ($entryName == 'word/_rels/document.xml.rels'){
+            if ($entryName == 'word/_rels/document.xml.rels') {
                 $this->_xmlRelations = zip_entry_read($zipEntry, zip_entry_filesize($zipEntry));
             } else if ($entryName == 'word/document.xml') {
                 $this->_xmlStructure = zip_entry_read($zipEntry, zip_entry_filesize($zipEntry));
-            } else if ($entryName == 'word/styles.xml' ){
+            } else if ($entryName == 'word/styles.xml') {
                 $this->_xmlStyles = zip_entry_read($zipEntry, zip_entry_filesize($zipEntry));
-            } else if (strpos($entryName, 'word/media') !== false ) {
+            } else if (strpos($entryName, 'word/media') !== false) {
                 # Removes 'word/media' prefix
                 $imageName = substr($entryName, 11);
 
@@ -133,16 +141,16 @@ abstract class DocxFileManipulation {
                 if (substr($imageName, -3) == 'emf') continue;
 
                 $imageData = base64_encode(
-                    zip_entry_read($zipEntry, zip_entry_filesize( $zipEntry )  )
+                    zip_entry_read($zipEntry, zip_entry_filesize($zipEntry))
                 );
                 $this->_fileAttachments[$imageName] = $this->_createFileAttachmentFromSource($imageName, $imageData);
             }
-            zip_entry_close($zipEntry) ;
+            zip_entry_close($zipEntry);
         }
-        zip_close($zipArchive ) ;
+        zip_close($zipArchive);
 
 
-        $this->_processRelationships()  ;
+        $this->_processRelationships();
         $this->_processStyleInfo();
     }
 
@@ -152,7 +160,8 @@ abstract class DocxFileManipulation {
      * @desc Process the xmlRelations into link
      * mappings, and pull out any additional image data that is available !
      */
-    private function _processRelationships(){
+    private function _processRelationships()
+    {
         if ($this->_xmlRelations != '') {
             $dom = new \DOMDocument();
             $dom->loadXML($this->_xmlRelations, LIBXML_NOENT | LIBXML_XINCLUDE | LIBXML_NOERROR | LIBXML_NOWARNING);
@@ -166,16 +175,16 @@ abstract class DocxFileManipulation {
                 /*
                  * Now split the links from image assets
                  */
-                if (is_object($relationId) && is_object($relationTarget)){
+                if (is_object($relationId) && is_object($relationTarget)) {
                     $linkupId = $relationId->nodeValue;
-                    if (stripos($relationType->nodeValue, 'relationships/hyperlink') !== false){
+                    if (stripos($relationType->nodeValue, 'relationships/hyperlink') !== false) {
                         $this->_linkAttachments[$linkupId] = new LinkAttachment(
                             $linkupId,
                             $relationTarget->nodeValue
                         );
                     } else if (stripos($relationType->nodeValue, 'relationships/image') !== false) {
                         $imageName = substr($relationTarget->nodeValue, 6);
-                        $this->_fileAttachments[$imageName]->setLinkupId($linkupId ) ;
+                        $this->_fileAttachments[$imageName]->setLinkupId($linkupId);
                     }
                 }
             }
@@ -185,33 +194,32 @@ abstract class DocxFileManipulation {
     /**
      * @desc Process the style info
      */
-    private function _processStyleInfo(){
+    private function _processStyleInfo()
+    {
         $dom = new \DOMDocument();
         $dom->loadXML($this->_xmlStyles, LIBXML_NOENT | LIBXML_XINCLUDE | LIBXML_NOERROR | LIBXML_NOWARNING);
         $dom->encoding = 'utf-8';
         $styleElements = $dom->getElementsByTagName('style');
-        foreach ($styleElements as $styleElement ) {
+        foreach ($styleElements as $styleElement) {
             /**
              * @var $styleElement \DOMElement
              */
             $validStyleCore = 0;
             $styleId = null;
-            foreach ($styleElement->attributes as $attribute){
+            foreach ($styleElement->attributes as $attribute) {
                 /**
                  * @var $attribute \DOMAttr
                  */
                 if ($attribute->nodeName == 'w:customStyle' && $attribute->nodeValue == 1) {
                     $validStyleCore++;
                 }
-                if ($attribute->nodeName == 'w:styleId' && $attribute->nodeValue != ''){
+                if ($attribute->nodeName == 'w:styleId' && $attribute->nodeValue != '') {
                     $styleId = $attribute->nodeValue;
                     $validStyleCore++;
                 }
             }
-            if ( $validStyleCore < 2) continue;
+            if ($validStyleCore < 2) continue;
             $this->_detectedStyles[] = $styleId;
         }
-
     }
-
 }
