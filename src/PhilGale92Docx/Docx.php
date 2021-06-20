@@ -54,12 +54,7 @@ class Docx extends DocxFileManipulation {
         $this->_parsed = true ;
 
         parent::parse();
-        try {
-            $this->_loadNodes();
-        } catch (\Exception $e) {
-            var_dump($e);
-            die;
-        }
+        $this->_loadNodes();
     }
 
     /**
