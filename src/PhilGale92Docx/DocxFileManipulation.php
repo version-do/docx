@@ -184,7 +184,9 @@ abstract class DocxFileManipulation
                         );
                     } else if (stripos($relationType->nodeValue, 'relationships/image') !== false) {
                         $imageName = substr($relationTarget->nodeValue, 6);
-                        $this->_fileAttachments[$imageName]->setLinkupId($linkupId);
+                        if(isset($this->_fileAttachments[$imageName])){
+                            $this->_fileAttachments[$imageName]->setLinkupId($linkupId);
+                        }
                     }
                 }
             }
